@@ -16,7 +16,6 @@ import {
     arrayMove,
     SortableContext,
     sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import {
     useSortable
@@ -50,10 +49,9 @@ function SortableItem(props: {
         border: props.item.isSelected ? '2px solid blue' : 'none',
         width: '10vw',
         height: '8vh',
-        backgroundColor: '#f9f9f9'
     };
     return (
-        <div
+        <button
             ref={setNodeRef}
             style={style}
             {...attributes}
@@ -61,7 +59,7 @@ function SortableItem(props: {
             onDoubleClick={() => props.toggleSelect()}
         >
             <p>{props.item.title}</p>
-        </div>
+        </button>
     );
 }
 
@@ -117,14 +115,19 @@ export default function ItemList() {
     }, [loadMore, loading]);
 
     const saveUpdatedItems = async (updatedItems: Item[]) => {
-        console.log(items);
         try {
             const response = await fetch('http://localhost:3000/items', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ items: updatedItems }),
+                // If item gets updated during search
+                // It fucks up order of items after search clears
+                // I disabled an ability to sort during search to fix this
+                body: JSON.stringify({
+                    items: updatedItems,
+                    isInSearch: !!search,
+                }),
             });
 
             if (!response.ok) {
@@ -195,7 +198,6 @@ export default function ItemList() {
                 >
                     <SortableContext
                         items={items.map((item) => item.id)}
-                        strategy={verticalListSortingStrategy}
                     >
                         <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '50px'}}>
                             {items.map((item) => (

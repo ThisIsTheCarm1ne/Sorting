@@ -10,7 +10,7 @@ app.get('/', (req, res) => {
     res.send('Hello World!');
 })
 
-const allItems = Array.from({ length: 300 }, (_, index) => ({
+let allItems = Array.from({ length: 1_000_000 }, (_, index) => ({
     id: index + 1,
     title: `Title ${index + 1}`,
     isSelected: false,
@@ -46,23 +46,45 @@ app.get('/items', (req, res) => {
 
 // This endpoint takes array of items to update the allItems array
 app.put('/items', (req, res) => {
-    const { items } = req.body;
+    const items = req.body.items;
 
-    const updatedItems = items.map((updatedItem) => {
-        const existingItem = allItems.find((item) => item.id === updatedItem.id);
-        if (existingItem) {
+    // If item gets updated during search
+    // It fucks up order of items after search clears
+    // I disabled an ability to sort during search to fix this
+    const isInSearch = req.body.isInSearch;
+
+    if (isInSearch) {
+        const updatedItemsMap = new Map(items.map((item) => [item.id, item]));
+
+        allItems = allItems.map((item) =>
+            updatedItemsMap.has(item.id)
+                ? { ...item, ...updatedItemsMap.get(item.id) } // Apply updates
+                : item
+        );
+    } else {
+        const updatedIds = new Set(items.map((item) => item.id));
+
+        const updatedItems = items.map((updatedItem) => {
+            const existingItem = allItems.find((item) => item.id === updatedItem.id);
             return {
                 ...existingItem,
                 ...updatedItem,
             };
-        }
-        return null;
-    }).filter(Boolean);
+        });
 
-    // Update `allItems` to reflect the new order
-    const updatedIds = new Set(items.map((item) => item.id));
-    const remainingItems = allItems.filter((item) => !updatedIds.has(item.id));
-    allItems.splice(0, allItems.length, ...updatedItems, ...remainingItems);
+        const remainingItems = allItems.filter((item) => !updatedIds.has(item.id));
+
+        const mergedItems = [...remainingItems];
+
+        for (const updatedItem of updatedItems) {
+            const index = items.findIndex((item) => item.id === updatedItem.id);
+            if (index !== -1) {
+                mergedItems.splice(index, 0, updatedItem);
+            }
+        }
+
+        allItems = mergedItems;
+    }
 
     res.status(200).send({ message: 'Items updated successfully' });
 });
