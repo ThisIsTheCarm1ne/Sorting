@@ -114,19 +114,37 @@ export default function ItemList() {
         };
     }, [loadMore, loading]);
 
-    const saveUpdatedItems = async (updatedItems: Item[]) => {
+    const saveCheckedItem = async (id: number) => {
         try {
-            const response = await fetch('http://localhost:3000/items', {
+            const response = await fetch('http://localhost:3000/toggle-select', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                // If item gets updated during search
-                // It fucks up order of items after search clears
-                // I disabled an ability to sort during search to fix this
                 body: JSON.stringify({
-                    items: updatedItems,
-                    isInSearch: !!search,
+                    id,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Error updating item: ${response.statusText}`);
+            }
+
+            console.log('Item successfully updated on the server');
+        } catch (error) {
+            console.error('Error saving item:', error);
+        }
+    };
+
+    const saveUpdatedItems = async (updatedItem: { id: number, nearestRightItemId: number | null }) => {
+        try {
+            const response = await fetch('http://localhost:3000/reorder-items', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    items: updatedItem,
                 }),
             });
 
@@ -147,7 +165,7 @@ export default function ItemList() {
                     ? {...item, isSelected: !item.isSelected}
                     : item
             );
-            saveUpdatedItems(updatedItems);
+            saveCheckedItem(id);
             return updatedItems;
         });
     };
@@ -174,8 +192,15 @@ export default function ItemList() {
                 const oldIndex = items.findIndex((item) => item.id === active.id);
                 const newIndex = items.findIndex((item) => item.id === over.id);
 
+                const nearestRightItemId = newIndex < items.length - 1 ? items[newIndex].id : null;
+
+                const updatedItem = {
+                    id: active.id,
+                    nearestRightItemId: nearestRightItemId
+                };
+
+                saveUpdatedItems(updatedItem);
                 const newArray = arrayMove(items, oldIndex, newIndex);
-                saveUpdatedItems(newArray);
                 return newArray;
             });
 
