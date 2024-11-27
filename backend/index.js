@@ -44,47 +44,47 @@ app.get('/items', (req, res) => {
     });
 });
 
-// This endpoint takes array of items to update the allItems array
-app.put('/items', (req, res) => {
-    const items = req.body.items;
+// This endpoint searchs for object by id
+// Then selects it
+app.put('/toggle-select', (req, res) => {
+    const { id } = req.body;
 
-    // If item gets updated during search
-    // It fucks up order of items after search clears
-    // I disabled an ability to sort during search to fix this
-    const isInSearch = req.body.isInSearch;
+    // Find the item by its id
+    const item = allItems.find(item => item.id === id);
 
-    if (isInSearch) {
-        const updatedItemsMap = new Map(items.map((item) => [item.id, item]));
-
-        allItems = allItems.map((item) =>
-            updatedItemsMap.has(item.id)
-                ? { ...item, ...updatedItemsMap.get(item.id) } // Apply updates
-                : item
-        );
-    } else {
-        const updatedIds = new Set(items.map((item) => item.id));
-
-        const updatedItems = items.map((updatedItem) => {
-            const existingItem = allItems.find((item) => item.id === updatedItem.id);
-            return {
-                ...existingItem,
-                ...updatedItem,
-            };
-        });
-
-        const remainingItems = allItems.filter((item) => !updatedIds.has(item.id));
-
-        const mergedItems = [...remainingItems];
-
-        for (const updatedItem of updatedItems) {
-            const index = items.findIndex((item) => item.id === updatedItem.id);
-            if (index !== -1) {
-                mergedItems.splice(index, 0, updatedItem);
-            }
-        }
-
-        allItems = mergedItems;
+    if (!item) {
+        return res.status(404).send({ message: 'Item not found' });
     }
+
+    item.isSelected = !item.isSelected;
+
+    // Return the updated item or the entire list if necessary
+    res.status(200).send({ message: 'Item selection toggled', item });
+});
+
+app.put('/reorder-items', (req, res) => {
+    const { id, nearestRightItemId } = req.body.items;
+
+    // Find the item to be moved
+    const itemIndex = allItems.findIndex(item => item.id === id);
+    if (itemIndex === -1) {
+        return res.status(404).send({ message: 'Item not found' });
+    }
+
+    // Find the position of the nearestRightItem
+    let toIndex = -1;
+    if (nearestRightItemId) {
+        toIndex = allItems.findIndex(item => item.id === nearestRightItemId);
+    }
+
+    // If nearestRightItem doesn't exist, move it to the end
+    if (toIndex === -1) {
+        toIndex = allItems.length;
+    }
+
+    const [item] = allItems.splice(itemIndex, 1);
+
+    allItems.splice(toIndex, 0, item);
 
     res.status(200).send({ message: 'Items updated successfully' });
 });
